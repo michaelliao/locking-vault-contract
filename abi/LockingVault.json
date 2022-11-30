@@ -141,7 +141,7 @@
                         "type": "uint64"
                     }
                 ],
-                "internalType": "struct LockVault.Lock",
+                "internalType": "struct LockingVault.Lock",
                 "name": "",
                 "type": "tuple"
             }
