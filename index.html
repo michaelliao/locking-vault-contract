@@ -1,0 +1,1005 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Deploy Ethereum-compatible contract on multiple chains with same address.">
+
+    <title>Locking Vault</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.2/font/bootstrap-icons.css">
+
+    <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@2.6.12/dist/vue.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/ethers@5.0.32/dist/ethers.umd.min.js"></script>
+
+    <style>
+        .x-border {
+            border: 1px solid #ced4da;
+            border-left: 0.25rem solid #5bc0de;
+            border-radius: 0.25rem;
+            padding: 1rem;
+        }
+
+        .x-withdraw-selected {
+            background-color: #eee;
+        }
+
+        .bg-gray:hover {
+            background-color: #eee;
+        }
+
+        .text-numeric {
+            font-variant-numeric: tabular-nums;
+        }
+
+        a {
+            text-decoration: none;
+        }
+
+        textarea {
+            resize: vertical;
+            font-family: Monaco, 'Lucida Console', 'Courier New', Courier, monospace;
+        }
+    </style>
+
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-G71EH5JJVS"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag() { dataLayer.push(arguments); }
+        gtag('js', new Date());
+        gtag('config', 'G-G71EH5JJVS');
+    </script>
+
+    <script>
+        window.VAULT_ADDR = '0xFed06e5b1A38C4277ac48Dd88229d4417fbd4d4B';
+        window.VAULT_ABI = '[{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"id","type":"uint256"},{"indexed":true,"internalType":"address","name":"owner","type":"address"},{"indexed":true,"internalType":"address","name":"token","type":"address"},{"indexed":false,"internalType":"uint256","name":"total","type":"uint256"},{"indexed":false,"internalType":"uint64","name":"startAt","type":"uint64"},{"indexed":false,"internalType":"uint64","name":"endAt","type":"uint64"}],"name":"Locked","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"id","type":"uint256"},{"indexed":true,"internalType":"address","name":"owner","type":"address"},{"indexed":true,"internalType":"address","name":"token","type":"address"},{"indexed":false,"internalType":"uint256","name":"amount","type":"uint256"},{"indexed":false,"internalType":"uint256","name":"balance","type":"uint256"}],"name":"Withdrawed","type":"event"},{"inputs":[{"internalType":"address","name":"owner","type":"address"}],"name":"lockIds","outputs":[{"internalType":"uint256[]","name":"","type":"uint256[]"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"uint256","name":"id","type":"uint256"}],"name":"lockInfo","outputs":[{"components":[{"internalType":"address","name":"token","type":"address"},{"internalType":"uint256","name":"total","type":"uint256"},{"internalType":"uint256","name":"balance","type":"uint256"},{"internalType":"uint64","name":"startAt","type":"uint64"},{"internalType":"uint64","name":"lastAt","type":"uint64"},{"internalType":"uint64","name":"endAt","type":"uint64"}],"internalType":"struct LockingVault.Lock","name":"","type":"tuple"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"token","type":"address"},{"internalType":"uint64","name":"startAt","type":"uint64"},{"internalType":"uint64","name":"endAt","type":"uint64"},{"internalType":"address[]","name":"owners","type":"address[]"},{"internalType":"uint256[]","name":"amounts","type":"uint256[]"}],"name":"lockToken","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint256[]","name":"ids","type":"uint256[]"}],"name":"withdrawToken","outputs":[],"stateMutability":"nonpayable","type":"function"}]';
+        window.ERC20_ABI = '[{"inputs":[{"internalType":"address","name":"owner","type":"address"},{"internalType":"address","name":"spender","type":"address"}],"name":"allowance","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"spender","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"approve","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"account","type":"address"}],"name":"balanceOf","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"decimals","outputs":[{"internalType":"uint8","name":"","type":"uint8"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"name","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"symbol","outputs":[{"internalType":"string","name":"","type":"string"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"transfer","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address","name":"from","type":"address"},{"internalType":"address","name":"to","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"}],"name":"transferFrom","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"}]';
+
+        window.CHAINS = {
+            '1': ['Ethereum', 'https://etherscan.io'],
+            '5': ['Goerli Testnet', 'https://goerli.etherscan.io'],
+            '56': ['BSC', 'https://bscscan.com'],
+            '97': ['BSC Testnet', 'https://testnet.bscscan.com'],
+            '137': ['Polygon', 'https://polygonscan.com'],
+            '80001': ['Ploygon Testnet', 'https://mumbai.polygonscan.com'],
+            '128': ['Heco', 'https://hecoinfo.com']
+        };
+
+        $(function () {
+            for (let chainId in window.CHAINS) {
+                let chain = window.CHAINS[chainId];
+                $('#chainList').append('<a target="_blank" href="' + chain[1] + '" class="me-4">' + chain[0] + ' <i class="bi bi-box-arrow-up-right"></i></a>');
+            }
+        });
+
+        function epoch() {
+            return Math.floor(Date.now() / 1000);
+        }
+
+        function toISODateTime(ts) {
+            let
+                dt = new Date(ts * 1000),
+                y = dt.getFullYear(),
+                m = dt.getMonth() + 1,
+                d = dt.getDate(),
+                h = dt.getHours();
+            return y + '-' + (m < 10 ? '0' : '') + m + '-' + (d < 10 ? '0' : '') + d + 'T' + (h < 10 ? '0' : '') + h + ':00:00';
+        }
+
+        function toBN(s, decimals) {
+            try {
+                return ethers.utils.parseUnits(s.trim(), decimals);
+            } catch (e) {
+                return null;
+            }
+        }
+
+        function isValidBN(s, decimals) {
+            let bn = toBN(s, decimals);
+            return bn !== null && !bn.isZero() && !bn.isNegative();
+        }
+
+        function isValidAddress(s) {
+            try {
+                ethers.utils.getAddress(s);
+                return true;
+            } catch (e) {
+                return false;
+            }
+        }
+
+        function getWeb3Provider() {
+            if (!window.web3Provider) {
+                if (!window.ethereum) {
+                    console.error("there is no web3 provider.");
+                    return null;
+                }
+                window.web3Provider = new ethers.providers.Web3Provider(window.ethereum, "any");
+            }
+            return window.web3Provider;
+        }
+
+        function showAlert(title, message) {
+            let m = $('#alertModal');
+            m.find('.x-title').text(title);
+            m.find('.x-message').text(message);
+            let myModal = new bootstrap.Modal(m.get(0), { backdrop: 'static', keyboard: false });
+            myModal.show();
+        }
+
+        function showInfo(title, message) {
+            let m = $('#infoModal');
+            m.find('.x-title').text(title);
+            m.find('.x-message').text(message);
+            let myModal = new bootstrap.Modal(m.get(0), { backdrop: 'static', keyboard: false });
+            myModal.show();
+        }
+
+        function showLoading(title, message) {
+            let m = $('#loadingModal');
+            let myModal = new bootstrap.Modal(m.get(0), { backdrop: 'static', keyboard: false });
+            let obj = {
+                setTitle: (t) => {
+                    m.find('.x-title').text(t);
+                },
+                setMessage: (t) => {
+                    m.find('.x-message').text(t);
+                },
+                close: () => {
+                    setTimeout(function () {
+                        myModal.hide();
+                    }, 500);
+                }
+            }
+            obj.setTitle(title);
+            obj.setMessage(message);
+            myModal.show();
+            return obj;
+        }
+
+        function translateError(err) {
+            window.err = err;
+            if (typeof (err) === 'string') {
+                return err;
+            }
+            if (err.error && err.error.code && err.error.message) {
+                return `Error (${err.error.code}): ${err.error.message}`;
+            }
+            if (err.code && err.message) {
+                return `Error (${err.code}): ${err.message}`;
+            }
+            return err.message || err.toString();
+        }
+
+        function newWithdrawItem(id) {
+            return {
+                loaded: false,
+                selected: false,
+                id: id,
+                token: '',
+                name: '',
+                symbol: '',
+                decimals: NaN,
+                startAt: 0,
+                endAt: 0,
+                total: NaN,
+                balance: NaN
+            };
+        }
+
+        function init() {
+            console.log('init vue...');
+            window.currentEpoch = epoch();
+            window.vm = new Vue({
+                el: '#vm',
+                data: {
+                    account: null,
+                    chainId: 0,
+                    tab: 'withdraws',
+                    current: window.currentEpoch,
+                    // withdraw:
+                    withdraw: {
+                        version: 0,
+                        loading: false,
+                        items: []
+                    },
+                    // deposit:
+                    deposit: {
+                        token: '',
+                        startAt: toISODateTime(window.currentEpoch + 86400),
+                        endAt: toISODateTime(window.currentEpoch + 31 * 86400),
+                        items: [
+                            {
+                                address: '',
+                                amount: ''
+                            }
+                        ]
+                    }
+                },
+                computed: {
+                    depositPeriod: function () {
+                        if (this.deposit.startAt === '' || this.deposit.endAt === '') {
+                            return '';
+                        }
+                        let
+                            start = new Date(this.deposit.startAt).getTime() / 1000,
+                            end = new Date(this.deposit.endAt).getTime() / 1000,
+                            last = end - start;
+                        if (last < 3600) {
+                            return 'Invalid start / end time.';
+                        }
+                        let days = Math.floor(last / (3600 * 24));
+                        last = last - days * 3600 * 24;
+                        let hours = Math.floor(last / 3600);
+                        last = last - hours * 3600;
+                        let minutes = Math.floor(last / 60);
+                        let s = '';
+                        if (days === 1) {
+                            s = s + days + ' day ';
+                        }
+                        if (days > 1) {
+                            s = s + days + ' days ';
+                        }
+                        if (hours === 1) {
+                            s = s + hours + ' hour ';
+                        }
+                        if (hours > 1) {
+                            s = s + hours + ' hours ';
+                        }
+                        if (minutes === 1) {
+                            s = s + minutes + ' minute ';
+                        }
+                        if (minutes > 1) {
+                            s = s + minutes + ' minutes ';
+                        }
+                        return s;
+                    },
+                    depositTotal: function () {
+                        let total = ethers.utils.parseEther('0');
+                        this.deposit.items.forEach(item => {
+                            if (item.amount !== '') {
+                                try {
+                                    let s = ethers.utils.parseEther(item.amount.trim());
+                                    total = total.add(s);
+                                } catch (e) {
+                                }
+                            }
+                        });
+                        return ethers.utils.formatEther(total);
+                    },
+                    ready: function () {
+                        return this.account && this.chainId > 0;
+                    },
+                    networkName: function () {
+                        if (this.account) {
+                            let cs = window.CHAINS[this.chainId];
+                            if (cs) {
+                                return cs[0];
+                            }
+                            return 'Unsupported Chain (0x' + this.chainId.toString(16) + ')';
+                        }
+                        return 'Not connected';
+                    },
+                    wrongNetwork: function () {
+                        return this.account && !window.CHAINS[this.chainId];
+                    }
+                },
+                methods: {
+                    selectTab: function (tab) {
+                        $('#tab-' + this.tab).hide();
+                        $('#a-tab-' + this.tab).removeClass('active');
+                        this.tab = tab;
+                        $('#tab-' + this.tab).show();
+                        $('#a-tab-' + this.tab).addClass('active');
+                    },
+                    addDepositItem: function () {
+                        this.deposit.items.push({ address: '', amount: '' });
+                    },
+                    removeDepositItem: function (index) {
+                        this.deposit.items.splice(index, 1);
+                    },
+                    batchWithdraw: async function () {
+                        let ids = [];
+                        for (let i = 0; i < this.withdraw.items.length; i++) {
+                            let item = this.withdraw.items[i];
+                            if (item.selected) {
+                                ids.push(item.id);
+                            }
+                        }
+                        if (ids.length === 0) {
+                            return showAlert('Error', 'Please select tokens to withdraw.');
+                        }
+                        let
+                            loading = showLoading('Withdraw', 'Please sign transaction in MetaMask...'),
+                            vault = new ethers.Contract(window.VAULT_ADDR, window.VAULT_ABI, window.getWeb3Provider().getSigner());
+                        try {
+                            let tx = await vault.withdrawToken(ids);
+                            loading.setMessage('Please wait for blockchain confirmation...');
+                            await tx.wait(1);
+                            loading.close();
+                            showInfo('Success', 'Withdraw successfully!');
+                            this.refreshWithdraws();
+                        } catch (err) {
+                            loading.close();
+                            return showAlert('Error', translateError(err));
+                        }
+                    },
+                    depositToken: async function () {
+                        // check:
+                        if (!this.ready) {
+                            return showAlert('Error', 'Please connect to wallet first!');
+                        }
+                        if (this.wrongNetwork) {
+                            return showAlert('Error', 'The connected network is not supported!');
+                        }
+                        if (!isValidAddress(this.deposit.token)) {
+                            return showAlert('Error', 'Invalid token address!');
+                        }
+                        if (this.deposit.startAt === '') {
+                            return showAlert('Error', 'Invalid start time!');
+                        }
+                        if (this.deposit.endAt === '') {
+                            return showAlert('Error', 'Invalid end time!');
+                        }
+                        let
+                            now = epoch(),
+                            startAt = Math.floor(new Date(this.deposit.startAt).getTime() / 1000),
+                            endAt = Math.floor(new Date(this.deposit.endAt).getTime() / 1000);
+                        if (startAt < now) {
+                            return showAlert('Error', 'Start time must be future!');
+                        }
+                        if (endAt <= startAt) {
+                            return showAlert('Error', 'End time must be after start time!');
+                        }
+                        if (endAt - startAt < 3600) {
+                            return showAlert('Error', 'Withdraw period must at least 1 hour!');
+                        }
+                        let addresses = [];
+                        for (let i = 0; i < this.deposit.items.length; i++) {
+                            let item = this.deposit.items[i];
+                            if (!isValidAddress(item.address)) {
+                                return showAlert('Error', '#' + (i + 1) + ' address of user is invalid.');
+                            }
+                            console.log(addresses);
+                            if (addresses.indexOf(item.address.toLowerCase()) >= 0) {
+                                return showAlert('Error', '#' + (i + 1) + ' address of user is duplicate.');
+                            }
+                            if (!isValidBN(item.amount, 18)) {
+                                return showAlert('Error', '#' + (i + 1) + ' amount of user is invalid.');
+                            }
+                            addresses.push(item.address.toLowerCase());
+                        }
+                        let
+                            loading = showLoading('Loading', 'Loading token information...'),
+                            erc = new ethers.Contract(this.deposit.token, window.ERC20_ABI, window.getWeb3Provider().getSigner());
+                        try {
+                            let
+                                erc_symbol = await erc.symbol(),
+                                erc_name = await erc.name(),
+                                erc_decimals = await erc.decimals(),
+                                total = ethers.utils.parseUnits('0', erc_decimals),
+                                amount,
+                                amounts = [];
+                            for (let i = 0; i < this.deposit.items.length; i++) {
+                                let item = this.deposit.items[i];
+                                if (!isValidBN(item.amount, erc_decimals)) {
+                                    loading.close();
+                                    return showAlert('Error', '#' + (i + 1) + ' amount of user is invalid.');
+                                }
+                                amount = toBN(item.amount, erc_decimals);
+                                amounts.push(amount);
+                                total = total.add(amount);
+                            }
+                            loading.setMessage('Will deposit ' + this.formatBN(total, erc_decimals) + erc_symbol + ' (' + erc_name + '), check balance...');
+                            let erc_balance = await erc.balanceOf(this.account);
+                            if (erc_balance.lt(total)) {
+                                throw 'You don\'t have enough ' + erc_symbol + '. Require at least ' + this.formatBN(total, erc_decimals) + '.';
+                            }
+                            loading.setMessage('Check allowance...');
+                            let erc_allowance = await erc.allowance(this.account, window.VAULT_ADDR);
+                            if (erc_allowance.lt(total)) {
+                                loading.setMessage('Please approve the Locking Vault contract to spend your ' + erc_symbol + ' in MetaMask...');
+                                let tx_approve = await erc.approve(window.VAULT_ADDR, ethers.utils.parseUnits('1000000000000000000', 18));
+                                loading.setMessage('Please wait for blockchain confirmation...');
+                                await tx_approve.wait(1);
+                            }
+                            loading.setMessage('Please confirm the deposit transaction in MetaMask...');
+                            let
+                                vault = new ethers.Contract(window.VAULT_ADDR, window.VAULT_ABI, window.getWeb3Provider().getSigner()),
+                                tx = await vault.lockToken(this.deposit.token, startAt, endAt, addresses, amounts);
+
+                            loading.setMessage('Please wait for blockchain confirmation...');
+                            await tx.wait(1);
+                            loading.close();
+                            this.deposit.items = [];
+                            showInfo('Success', 'Deposit successfully!');
+                        } catch (err) {
+                            loading.close();
+                            return showAlert('Error', translateError(err));
+                        }
+                    },
+                    refreshWithdraws: function () {
+                        if (this.ready && !this.wrongNetwork) {
+                            this.doReloadWithdraws()
+                                .then(() => console.log('reloaded.'))
+                                .catch(e => console.error(e));
+                        } else {
+                            this.withdraw.version++;
+                            this.withdraw.loading = false;
+                            this.withdraw.items = [];
+                        }
+                    },
+                    doReloadWithdraws: async function () {
+                        console.log('reload withdraws...');
+                        this.withdraw.version++;
+                        this.withdraw.loading = true;
+                        this.withdraw.items = [];
+                        let version = this.withdraw.version;
+                        try {
+                            let
+                                vault = new ethers.Contract(window.VAULT_ADDR, window.VAULT_ABI, window.getWeb3Provider().getSigner()),
+                                ids = await vault.lockIds(this.account);
+                            console.log(ids);
+                            if (version !== this.withdraw.version) {
+                                throw 'version changed!';
+                            }
+                            for (let i = 0; i < ids.length; i++) {
+                                let item = newWithdrawItem(ids[i].toNumber());
+                                this.withdraw.items.push(item);
+                            }
+                            let
+                                tokenInfos = {},
+                                len = this.withdraw.items.length;
+                            for (let i = 0; i < len; i++) {
+                                let item = this.withdraw.items[i];
+                                let lockInfo = await vault.lockInfo(item.id);
+                                console.log(lockInfo);
+                                if (version !== this.withdraw.version) {
+                                    throw 'version changed!';
+                                }
+                                let
+                                    token = lockInfo[0],
+                                    tokenInfo = tokenInfos[token];
+                                if (!tokenInfo) {
+                                    // load token info:
+                                    let
+                                        erc = new ethers.Contract(token, window.ERC20_ABI, window.getWeb3Provider().getSigner()),
+                                        erc_decimals = await erc.decimals(),
+                                        erc_symbol = await erc.symbol(),
+                                        erc_name = await erc.name();
+                                    tokenInfo = {
+                                        name: erc_name,
+                                        symbol: erc_symbol,
+                                        decimals: erc_decimals
+                                    };
+                                    tokenInfos[token] = tokenInfo;
+                                    if (version !== this.withdraw.version) {
+                                        throw 'version changed!';
+                                    }
+                                }
+                                item.token = token;
+                                item.name = tokenInfo.name;
+                                item.symbol = tokenInfo.symbol;
+                                item.decimals = tokenInfo.decimals;
+                                // lock:
+                                item.total = lockInfo[1];
+                                item.balance = lockInfo[2];
+                                item.startAt = lockInfo[3].toNumber();
+                                item.endAt = lockInfo[5].toNumber();
+                                item.loaded = true;
+                            }
+
+                        } catch (e) {
+                            console.error(e);
+                        }
+                        if (version === this.withdraw.version) {
+                            this.withdraw.loading = false;
+                        }
+                    },
+                    withdrawedPercent: function (item) {
+                        if (item.total.eq(item.balance)) {
+                            return 0;
+                        }
+                        return item.total.sub(item.balance).mul(100).div(item.total).toNumber();
+                    },
+                    canWithdraw: function (item) {
+                        if (this.current <= item.startAt) {
+                            return ethers.utils.parseEther('0');
+                        }
+                        // total * (current - start) / (end - start) - (total - balance)
+                        return item.total.mul(Math.min(this.current, item.endAt) - item.startAt).div(item.endAt - item.startAt).sub(item.total.sub(item.balance));
+                    },
+                    canWithdrawPercent: function (item) {
+                        if (this.current <= item.startAt) {
+                            return 0;
+                        }
+                        return this.canWithdraw(item).mul(100).div(item.total).toNumber();
+                    },
+                    abbrAddress: function (addr) {
+                        if (!addr) {
+                            return '';
+                        }
+                        let s = addr.toString();
+                        if (s.indexOf('0x') === 0 && s.length === 42) {
+                            let addr = ethers.utils.getAddress(s.substring(0));
+                            return addr.substring(0, 6) + '...' + addr.substring(38);
+                        }
+                        return s;
+                    },
+                    tokenUrl: function (addr) {
+                        let cs = window.CHAINS[this.chainId];
+                        if (cs) {
+                            return cs[1] + '/token/' + addr;
+                        } else {
+                            return '#1';
+                        }
+                    },
+                    gotoScanUrl: function () {
+                        let cs = window.CHAINS[this.chainId];
+                        if (cs) {
+                            window.open(cs[1] + '/address/' + this.account);
+                        } else {
+                            console.error('Invalid chain id: ', this.chainId);
+                        }
+                    },
+                    toDateString: function (num) {
+                        let
+                            dt = new Date(1000 * num),
+                            d = dt.toLocaleDateString(),
+                            t = dt.toLocaleTimeString(),
+                            pos = t.indexOf(':00', 3);
+                        if (pos > 0) {
+                            t = t.substring(0, pos) + t.substring(pos + 3);
+                        }
+                        return d + ' ' + t;
+                    },
+                    displayBN: function (bn, decimals) {
+                        let
+                            BN100 = ethers.utils.parseUnits('100', 0),
+                            B = ethers.utils.parseUnits('1000000000', decimals),
+                            M = ethers.utils.parseUnits('1000000', decimals),
+                            K = ethers.utils.parseUnits('1000', decimals);
+                        if (bn.gte(B)) {
+                            return ethers.utils.formatUnits(bn.mul(BN100).div(B), 2) + ' B';
+                        }
+                        if (bn.gte(M)) {
+                            return ethers.utils.formatUnits(bn.mul(BN100).div(M), 2) + ' M';
+                        }
+                        if (bn.gte(K)) {
+                            return ethers.utils.formatUnits(bn.mul(BN100).div(K), 2) + ' K';
+                        }
+                        // ##.###
+                        let
+                            s = ethers.utils.formatUnits(bn, decimals),
+                            n = s.indexOf('.'),
+                            pad;
+                        if (n === (-1)) {
+                            return s + '.000';
+                        }
+                        pad = 3 - (s.length - n - 1);
+                        if (pad > 0) {
+                            return s + '0'.repeat(3 - (s.length - n - 1));
+                        }
+                        return s.substring(0, n + 4);
+                    },
+                    formatBN: function (bn, decimals) {
+                        let
+                            s = ethers.utils.formatUnits(bn, decimals),
+                            n = s.indexOf('.');
+                        if (n == (-1)) {
+                            s = s + '.' + '0'.repeat(decimals);
+                        } else {
+                            s = s + '0'.repeat(decimals - (s.length - n - 1));
+                        }
+                        return s;
+                    },
+                    accountChanged: function (accounts) {
+                        console.log('wallet account changed:', accounts.length === 0 ? null : accounts[0]);
+                        if (accounts.length === 0) {
+                            this.disconnected();
+                        } else {
+                            this.account = accounts[0];
+                            document.cookie = '__account__=' + this.account + ';max-age=1296000';
+                        }
+                        this.refreshWithdraws();
+                    },
+                    disconnected: async function () {
+                        console.warn('wallet disconnected.');
+                        this.account = null;
+                        this.refreshWithdraws();
+                    },
+                    chainChanged: function (chainId) {
+                        console.log('wallet chainId changed: ' + chainId + ' = ' + parseInt(chainId, 16));
+                        this.chainId = parseInt(chainId, 16);
+                        this.refreshWithdraws();
+                    },
+                    connectWallet: async function () {
+                        console.log('try connect wallet...');
+                        if (window.getWeb3Provider() === null) {
+                            console.error('there is no web3 provider.');
+                            return false;
+                        }
+                        try {
+                            this.accountChanged(await window.ethereum.request({
+                                method: 'eth_requestAccounts',
+                            }));
+                            this.chainChanged(await window.ethereum.request({
+                                method: 'eth_chainId'
+                            }));
+                            window.ethereum.on('disconnect', this.disconnected);
+                            window.ethereum.on('accountsChanged', this.accountChanged);
+                            window.ethereum.on('chainChanged', this.chainChanged);
+                        } catch (e) {
+                            console.error('could not get a wallet connection.', e);
+                            return false;
+                        }
+                        console.log('wallet connected.');
+                        return true;
+                    }
+                }
+            });
+        }
+
+        $(function () {
+            init();
+            setInterval(() => {
+                window.vm.current = epoch();
+            }, 10000);
+        });
+    </script>
+</head>
+
+<body>
+    <!-- Loading Modal -->
+    <div id="loadingModal" class="modal fade" role="dialog" aria-hidden="true" aria-labelledby="loadingLabel">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header align-items-center d-flex">
+                    <h4 class="modal-title x-title" id="loadingLabel">&nbsp;</h4>
+                </div>
+                <div class="modal-body">
+                    <div class="float-start">
+                        <div class="spinner-border" role="status">
+                            <span class="visually-hidden">Loading...</span>
+                        </div>
+                    </div>
+                    <div class="ms-5 ps-4 float-none">
+                        <p class="x-message">&nbsp;</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button onclick="window.deploySalt.cancel = true;" class="btn btn-outline-primary"
+                        data-bs-dismiss="modal" aria-label="Close">Cancel</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Modal -->
+    <div id="alertModal" class="modal fade" role="dialog" aria-hidden="true" aria-labelledby="alertLabel">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header align-items-center d-flex">
+                    <h4 class="modal-title x-title" id="alertLabel">&nbsp;</h4>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true"><i class="fe fe-x-circle"></i></span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="float-start">
+                        <i class="fs-2 text-danger fe fe-alert-triangle"></i>
+                    </div>
+                    <div class="ms-5 ps-4 float-none">
+                        <p class="x-message">&nbsp;</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline-primary" data-bs-dismiss="modal" aria-label="Close">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Info Modal -->
+    <div id="infoModal" class="modal fade" role="dialog" aria-hidden="true" aria-labelledby="infoLabel">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header align-items-center d-flex">
+                    <h4 class="modal-title x-title" id="infoLabel">&nbsp;</h4>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true"><i class="fe fe-x-circle"></i></span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="float-start">
+                        <i class="fs-2 fe fe-info"></i>
+                    </div>
+                    <div class="ms-5 ps-4 float-none">
+                        <p class="x-message">&nbsp;</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn btn-outline-primary" data-bs-dismiss="modal" aria-label="Close">OK</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Deploy Modal -->
+    <div id="deployModal" class="modal fade" role="dialog" aria-hidden="true" aria-labelledby="deployLabel">
+        <div class="modal-dialog modal-lg" role="document">
+            <div class="modal-content">
+                <div class="modal-header align-items-center d-flex">
+                    <h4 class="modal-title x-title" id="deployLabel">Deploy Contract</h4>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true"><i class="fe fe-x-circle"></i></span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <p>The contract deployment is ready:</p>
+                    <form>
+                        <div class="mb-3">
+                            <textarea id="deployInfo" readonly rows="6" class="form-control form-control-sm"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <p>IMPORTANT: please <a href="#0" class="x-download">download</a> the deployment information
+                                for future
+                                deploy.</p>
+                        </div>
+                        <div class="mb-3">
+                            <p>Please click "Deploy" button to deploy after download.</p>
+                        </div>
+                    </form>
+
+                </div>
+                <div class="modal-footer">
+                    <button id="deployButton" class="btn btn-outline-primary">Deploy</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="vm" class="container">
+        <nav class="navbar navbar-expand-lg navbar-light bg-light border-bottom"
+            style="position:fixed; top:0; left:0; right:0; z-index: 99;">
+            <div class="container">
+                <a class="navbar-brand" href="#0"><i class="bi bi-database-lock"></i> Locking Vault</a>
+                <ul id="wallet" class="mr-2 navbar-nav navbar-right-wrap" style="flex-direction: row !important;">
+                    <li class="nav-item">
+                        <span class="nav-link"><i class="bi bi-globe"></i>
+                            <span v-text="networkName"></span></span>
+                    </li>
+                    <li v-if="account===null" class="nav-item">
+                        <button v-on:click="connectWallet" type="button" class="btn btn-primary">Connect Wallet</button>
+                    </li>
+                    <li v-if="account!==null" class="nav-item">
+                        <a href="#0" class="nav-link" v-on:click="gotoScanUrl"><i class="bi bi-wallet"></i>
+                            <span v-text="abbrAddress(account)"></span> <i class="fe fe-external-link"></i></a>
+                    </li>
+                    <li v-if="wrongNetwork" class="ms-2 d-inline-block">
+                        <span class="nav-link">Unsupported chain (<span v-text="chainId"></span>)</span>
+                    </li>
+                </ul>
+            </div>
+        </nav>
+
+        <div style="padding-top: 70px;">
+            <div class="row">
+                <div class="col">
+                    <div class="x-border">
+                        <h5>Introduction</h5>
+                        <p>The Locking Vault is an Ethereum contract that allows the DAO to lock any ERC20 tokens for
+                            the token holders with linear release. Supported chains:</p>
+                        <p id="chainList"></p>
+                        <p>Please read the <a target="_blank"
+                                href="https://github.com/michaelliao/contract-deployer/blob/master/doc.md">document
+                                <i class="bi bi-box-arrow-up-right"></i></a>
+                            to learn how to deploy contract.</p>
+                        <p>Make sure you have tested on testnet before use the mainnet.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="row mt-4">
+                <div class="col">
+                    <ul class="nav nav-tabs">
+                        <li class="nav-item">
+                            <a id="a-tab-withdraws" class="nav-link active" v-on:click="selectTab('withdraws')"
+                                href="#0">Withdraws</a>
+                        </li>
+                        <li class="nav-item">
+                            <a id="a-tab-deposit" class="nav-link" v-on:click="selectTab('deposit')"
+                                href=" #">Deposit</a>
+                        </li>
+                    </ul>
+                    <div class="border-start border-end border-bottom rounded p-3">
+                        <div id="tab-withdraws">
+                            <div class="mt-4">
+                                <h5>Withdraw Tokens</h5>
+                            </div>
+                            <div class="mt-4" v-show="withdraw.loading && withdraw.items.length===0">
+                                <p><span class="spinner-border spinner-border-sm"></span> Loading...</p>
+                            </div>
+                            <div class="mt-4" v-show="!withdraw.loading && withdraw.items.length===0">
+                                <p>No withdraw found or wallet is not connected.</p>
+                            </div>
+                            <table class="table" v-show="withdraw.items.length>0">
+                                <thead>
+                                    <tr>
+                                        <th scope="col">&nbsp;</th>
+                                        <th scope="col">Token</th>
+                                        <th scope="col">Lock Period</th>
+                                        <th scope="col">Status</th>
+                                        <th scope="col">Balance</th>
+                                        <th scope="col">Can Withdraw</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr v-for="item in withdraw.items"
+                                        v-bind:class="{'x-withdraw-selected':item.selected}">
+                                        <th><input v-model="item.selected" class="form-check-input" type="checkbox"
+                                                v-bind:disabled="!item.loaded || canWithdraw(item).isZero()"
+                                                value="true"></th>
+                                        <td>
+                                            <span v-show="!item.loaded" class="spinner-border spinner-border-sm"></span>
+                                            <a v-if="item.loaded" v-bind:href="tokenUrl(item.token)"
+                                                v-bind:title="item.name" target="_blank"><span
+                                                    v-text="item.symbol"></span>
+                                                <i class="bi bi-box-arrow-up-right"></i>
+                                            </a>
+                                        </td>
+                                        <td>
+                                            <span v-show="!item.loaded" class="spinner-border spinner-border-sm"></span>
+                                            <span v-if="item.loaded"
+                                                v-text="toDateString(item.startAt) + ' ~ ' + toDateString(item.endAt)"></span>
+                                        </td>
+                                        <td>
+                                            <span v-show="!item.loaded" class="spinner-border spinner-border-sm"></span>
+                                            <div v-if="item.loaded" class="progress">
+                                                <div class="progress-bar bg-warning"
+                                                    v-bind:style="{width:withdrawedPercent(item)+'%'}"></div>
+                                                <div class="progress-bar bg-success"
+                                                    v-bind:style="{width:canWithdrawPercent(item)+'%'}"></div>
+                                            </div>
+                                        </td>
+                                        <td>
+                                            <span v-show="!item.loaded" class="spinner-border spinner-border-sm"></span>
+                                            <span v-if="item.loaded" v-text="displayBN(item.balance, item.decimals)"
+                                                class="text-numeric"></span>
+                                        </td>
+                                        <td>
+                                            <span v-show="!item.loaded" class="spinner-border spinner-border-sm"></span>
+                                            <span v-if="item.loaded"
+                                                v-text="displayBN(canWithdraw(item), item.decimals)"
+                                                class="text-numeric"></span>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                            <div class="mt-4">
+                                <button v-on:click="batchWithdraw" type="button" class="btn btn-lg btn-primary">Withdraw
+                                    Selected Tokens</button>
+                            </div>
+                        </div>
+                        <div id="tab-deposit" style="display:none">
+                            <form action="#0" onsubmit="return false">
+                                <div class="mt-4">
+                                    <h5>Deposit Token</h5>
+                                </div>
+                                <div class="mt-4">
+                                    <label class="form-label">Token address:</label>
+                                    <input v-model="deposit.token" class="form-control" type="text" maxlength="66"
+                                        placeholder="0x">
+                                </div>
+                                <div class="mt-4">
+                                    <label class="form-label">Withdraw Start Time:</label>
+                                    <input v-model="deposit.startAt" class="form-control" type="datetime-local">
+                                </div>
+                                <div class="mt-4">
+                                    <label class="form-label">Withdraw End Time:</label>
+                                    <input v-model="deposit.endAt" class="form-control" type="datetime-local">
+                                </div>
+                                <div class="mt-4">
+                                    <label class="form-label">Withdraw Period:</label>
+                                    <input v-model="depositPeriod" class="form-control" type="text" readonly>
+                                </div>
+                                <div class="mt-4">
+                                    <h5>Add withdraw users</h5>
+                                </div>
+                                <div class="p-3 pb-0">
+                                    <div class="row">
+                                        <div class="col-6 col-sm-6 col-md-6 ms-1">
+                                            <span>Address:</span>
+                                        </div>
+                                        <div class="col-5 col-sm-5 col-md-5 ms-1">
+                                            <span>Amount:</span>
+                                        </div>
+                                        <div class="col-1 col-sm-1 col-md-1"></div>
+                                    </div>
+                                </div>
+                                <div v-for="(item, index) in deposit.items" class="p-3 rounded bg-gray">
+                                    <div class="row">
+                                        <div class="col-6 col-sm-6 col-md-6">
+                                            <input v-model="item.address" type="text" maxlength="66" placeholder="0x"
+                                                class="form-control">
+                                        </div>
+                                        <div class="col-5 col-sm-5 col-md-5">
+                                            <input v-model="item.amount" type="text" maxlength="20" placeholder="12.345"
+                                                class="form-control">
+                                        </div>
+                                        <div class="col-1 col-sm-1 col-md-1 pt-2">
+                                            <a v-on:click="removeDepositItem(index)" href="#0"
+                                                v-show="deposit.items.length>1"><i class="bi bi-trash"></i></a>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="mt-4 ps-3">
+                                    <button v-on:click="addDepositItem" type="button"
+                                        class="btn btn-outline-primary form-control-sm">Add</button>
+                                </div>
+                                <div class="mt-4">
+                                    <label class="form-label">Total amount:</label>
+                                    <input v-model="depositTotal" class="form-control" type="text" readonly>
+                                </div>
+                                <div class="mt-4">
+                                    <div class="alert alert-danger">
+                                        Please make sure you have tested on testnet! (e.g.
+                                        <a href="https://blockscan.com/address/0xBBB02DE94E1Dd1E99b43458027f31aBb2d75659B"
+                                            target="_blank">tBTC <i class="bi bi-box-arrow-up-right"></i></a>
+                                        ,
+                                        <a href="https://blockscan.com/address/0xEEE0C84193E02E67164b9b4402e47ef9CffA5b09"
+                                            target="_blank">tWETH <i class="bi bi-box-arrow-up-right"></i></a>
+                                        ,
+                                        <a href="https://blockscan.com/address/0xDDD076E315e288a7146E8c8612a57Baae4Df21C7"
+                                            target="_blank">tUSD <i class="bi bi-box-arrow-up-right"></i></a>
+                                        . Use faucet() to get test token.)
+                                    </div>
+                                </div>
+                                <div class="mt-4">
+                                    <button v-on:click="depositToken" type="button"
+                                        class="btn btn-lg btn-primary">Deposit Token</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer class="p-5 mt-5 bg-light border-top">
+        <div class="container">
+            <div class="row">
+                <div class="col-12">
+                    <div class="mb-4"><i class="bi bi-gear-wide-connected"></i> Locking Vault, copyleft 2022</div>
+                    <ul class="list-unstyled small text-muted">
+                        <li class="mb-2">Designed and built by
+                            <a target="_blank" href="https://github.com/michaelliao">Michael Liao
+                                <i class="bi bi-box-arrow-up-right"></i></a>.
+                        </li>
+                        <li class="mb-2">Fork me on
+                            <a target="_blank" href="https://github.com/michaelliao/locking-vault-contract">Github
+                                <i class="bi bi-box-arrow-up-right"></i></a>
+                        </li>
+                        <li class="mb-2">Code licensed
+                            <a target="_blank"
+                                href="https://github.com/michaelliao/locking-vault-contract/blob/master/LICENSE">GPLv3
+                                <i class="bi bi-box-arrow-up-right"></i></a>
+                        </li>
+                        <li class="mb-2">Check
+                            <a target="_blank"
+                                href="https://github.com/michaelliao/locking-vault-contract/blob/master/contracts/LockingVault.sol">contract
+                                source code
+                                <i class="bi bi-box-arrow-up-right"></i></a>.
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </footer>
+</body>
+
+</html>
