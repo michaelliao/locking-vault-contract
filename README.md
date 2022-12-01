@@ -6,3 +6,6 @@ Start: https://locking-vault.eth.itranswarp.com
 
 # Screenshot
 
+![withdraw](img/locking-withdraw.png)
+
+![deposit](img/locking-deposit.png)
