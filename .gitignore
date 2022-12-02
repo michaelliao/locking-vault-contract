@@ -2,6 +2,8 @@
 
 #################### Node.gitignore ####################
 
+cache/
+
 # Logs
 logs
 *.log
