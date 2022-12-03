@@ -3,6 +3,7 @@
 #################### Node.gitignore ####################
 
 cache/
+artifacts/
 
 # Logs
 logs
